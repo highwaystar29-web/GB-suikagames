@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>GB SUIKA</title>
 <style>
   :root{
@@ -19,12 +20,16 @@
     color:var(--c3);
     -webkit-user-select:none; user-select:none;
     touch-action:none;
+    overflow:hidden;
   }
   #shell{
     background:var(--c1);
     padding:18px;
     border-radius:14px;
     box-shadow:0 0 0 4px #1a1a1a, 0 10px 30px rgba(0,0,0,0.6);
+    max-width:96vw;
+    max-height:96vh;
+    box-sizing:border-box;
   }
   #screen{
     background:var(--c3);
@@ -37,6 +42,10 @@
   canvas{
     display:block;
     image-rendering:pixelated;
+  }
+  #game{
+    max-width:100%;
+    height:auto;
   }
   #hud{
     display:flex;
