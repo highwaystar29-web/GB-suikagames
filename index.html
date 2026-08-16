@@ -150,8 +150,8 @@
     { r:76, tone:2, name:'巨大カボチャ', shape:'giantpumpkin' },
   ];
 
-  const GRAVITY = 0.42;
-  const WALL_L = 14, WALL_R = W-14, FLOOR = H-10;
+  const GRAVITY = 0.5;
+  const WALL_L = 54, WALL_R = W-54, FLOOR = H-10;
   const DROP_Y = 30;
   const GAMEOVER_LINE = 40;
 
@@ -314,8 +314,8 @@
       if(Math.abs(b.vy)<0.06) b.vy = 0;
     }
 
-    // collision resolution, several gentle passes (soft correction to avoid overshoot/jitter)
-    for(let pass=0; pass<3; pass++){
+    // collision resolution, mass-weighted so big pieces don't get floated by small ones
+    for(let pass=0; pass<5; pass++){
       for(let i=0;i<bodies.length;i++){
         for(let j=i+1;j<bodies.length;j++){
           const a = bodies[i], b = bodies[j];
@@ -331,21 +331,31 @@
             }
             const overlap = (minDist - dist);
             const nx = dx/dist, ny = dy/dist;
-            const push = overlap*0.35; // partial correction, spread over passes/frames
-            a.x -= nx*push; a.y -= ny*push;
-            b.x += nx*push; b.y += ny*push;
+            const push = overlap*0.4; // partial correction, spread over passes/frames
+            // heavier (bigger) circle should barely move; lighter one yields
+            const massA = ra*ra, massB = rb*rb;
+            const shareA = massB/(massA+massB), shareB = massA/(massA+massB);
+            a.x -= nx*push*shareA; a.y -= ny*push*shareA;
+            b.x += nx*push*shareB; b.y += ny*push*shareB;
             const relvx = b.vx-a.vx, relvy = b.vy-a.vy;
             const rel = relvx*nx+relvy*ny;
             if(rel < 0){
               const bounce = 0.02;
-              a.vx -= nx*rel*bounce; a.vy -= ny*rel*bounce;
-              b.vx += nx*rel*bounce; b.vy += ny*rel*bounce;
+              a.vx -= nx*rel*bounce*shareA; a.vy -= ny*rel*bounce*shareA;
+              b.vx += nx*rel*bounce*shareB; b.vy += ny*rel*bounce*shareB;
             }
             // strong damping on contact to kill jitter/oscillation
             a.vx *= 0.8; b.vx *= 0.8;
             a.vy *= 0.9; b.vy *= 0.9;
           }
         }
+      }
+      // re-clamp against floor/walls each pass so pushes never lift a body off the floor
+      for(const b of bodies){
+        const r = TIERS[b.tier].r;
+        if(b.y + r > FLOOR){ b.y = FLOOR-r; if(b.vy>0) b.vy = 0; }
+        if(b.x - r < WALL_L) b.x = WALL_L+r;
+        if(b.x + r > WALL_R) b.x = WALL_R-r;
       }
     }
 
