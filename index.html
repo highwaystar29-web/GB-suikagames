@@ -150,7 +150,7 @@
     { r:76, tone:2, name:'巨大カボチャ', shape:'giantpumpkin' },
   ];
 
-  const GRAVITY = 0.5;
+  const GRAVITY = 0.42;
   const WALL_L = 54, WALL_R = W-54, FLOOR = H-10;
   const DROP_Y = 30;
   const GAMEOVER_LINE = 40;
@@ -194,6 +194,7 @@
     bodies.push({
       x,y,tier,
       vx:0, vy: vy||0,
+      angle:0,
       settledFrames:0,
       id: Math.random()
     });
@@ -312,6 +313,8 @@
       }
       if(Math.abs(b.vx)<0.06) b.vx = 0;
       if(Math.abs(b.vy)<0.06) b.vy = 0;
+      // rolling: angular velocity follows horizontal speed like a real object on the floor
+      b.angle = (b.angle||0) + (b.vx / r) * 0.9;
     }
 
     // collision resolution, mass-weighted so big pieces don't get floated by small ones
@@ -329,7 +332,11 @@
               mergePair(a,b,dist,minDist);
               continue;
             }
-            const overlap = (minDist - dist);
+            // allow a little visual overlap at rest so touching pieces sit snugly
+            // instead of leaving a gap between their outlines
+            const minDistPush = minDist*0.93;
+            if(dist >= minDistPush) continue;
+            const overlap = (minDistPush - dist);
             const nx = dx/dist, ny = dy/dist;
             const push = overlap*0.4; // partial correction, spread over passes/frames
             // heavier (bigger) circle should barely move; lighter one yields
@@ -431,6 +438,22 @@
         if(pattern[py][px]) g.fillRect(cx+x,cy+y,step,step);
       }
     }
+    // soft shadow, lower-right (sparse dark dither for a gradient feel)
+    g.fillStyle = PAL[0];
+    for(let y=-ry;y<ry;y+=step){
+      for(let x=-rx;x<rx;x+=step){
+        if(x > -rx*0.05 && y > -ry*0.05){
+          const px = Math.floor((x+rx)/step)%2;
+          const py = Math.floor((y+ry)/step)%2;
+          if((px+py)%2===0) g.fillRect(cx+x,cy+y,step,step);
+        }
+      }
+    }
+    // solid highlight blob, upper-left (gives the piece a rounded, glossy feel)
+    g.fillStyle = PAL[3];
+    g.beginPath();
+    g.ellipse(cx-rx*0.32, cy-ry*0.32, rx*0.28, ry*0.24, 0, 0, Math.PI*2);
+    g.fill();
     g.restore();
     g.strokeStyle = PAL[0];
     g.lineWidth = Math.max(1, Math.min(rx,ry)*0.08);
@@ -443,6 +466,7 @@
     const pattern = ditherPatterns[tone];
     const dark = PAL[Math.max(0,tone-1)];
     const light = PAL[tone];
+    const cx = bx+bw/2, cy = by+bh/2;
     g.save();
     pathFn();
     g.clip();
@@ -457,6 +481,22 @@
         if(pattern[py][px]) g.fillRect(x,y,step,step);
       }
     }
+    // soft shadow, lower-right
+    g.fillStyle = PAL[0];
+    for(let y=by;y<by+bh;y+=step){
+      for(let x=bx;x<bx+bw;x+=step){
+        if(x > cx-bw*0.05 && y > cy-bh*0.05){
+          const px = Math.floor((x-bx)/step)%2;
+          const py = Math.floor((y-by)/step)%2;
+          if((px+py)%2===0) g.fillRect(x,y,step,step);
+        }
+      }
+    }
+    // solid highlight blob, upper-left
+    g.fillStyle = PAL[3];
+    g.beginPath();
+    g.ellipse(cx-bw*0.16, cy-bh*0.16, bw*0.14, bh*0.12, 0, 0, Math.PI*2);
+    g.fill();
     g.restore();
     g.strokeStyle = PAL[0];
     g.lineWidth = Math.max(1, bw*0.045);
@@ -471,10 +511,14 @@
 
   // draws a produce-themed sprite whose SILHOUETTE (not just a plain circle)
   // matches the reference illustration, shaded with the 4-tone GB dither.
-  function drawProduce(cx,cy,r,tier,g){
+  function drawProduce(cx,cy,r,tier,g,angle){
     g = g || ctx;
     const t = TIERS[tier];
     const tone = t.tone;
+    g.save();
+    g.translate(cx,cy);
+    if(angle) g.rotate(angle);
+    cx = 0; cy = 0;
 
     switch(t.shape){
       case 'acorn': {
@@ -599,12 +643,12 @@
         break;
       }
       case 'pumpkin': {
-        fillEllipseDithered(g, cx, cy, r*1.05, r*0.85, tone);
+        fillEllipseDithered(g, cx, cy, r*0.96, r*0.82, tone);
         g.strokeStyle = PAL[0];
         g.lineWidth = Math.max(1, r*0.05);
         for(let k=-2;k<=2;k++){
           g.beginPath();
-          g.ellipse(cx, cy, Math.abs(k)*r*0.16+r*0.1, r*0.83, 0, 0, Math.PI*2);
+          g.ellipse(cx, cy, Math.abs(k)*r*0.16+r*0.1, r*0.8, 0, 0, Math.PI*2);
           g.stroke();
         }
         g.fillStyle = PAL[0];
@@ -634,7 +678,7 @@
         break;
       }
       case 'corn': {
-        fillEllipseDithered(g, cx, cy, r*0.52, r*1.05, tone);
+        fillEllipseDithered(g, cx, cy, r*0.5, r*0.96, tone);
         g.fillStyle = PAL[0];
         for(let ry=-0.85; ry<=0.85; ry+=0.28){
           for(let rx=-0.35; rx<=0.35; rx+=0.32){
@@ -657,12 +701,12 @@
         break;
       }
       case 'giantpumpkin': {
-        fillEllipseDithered(g, cx, cy, r*1.1, r*0.88, tone);
+        fillEllipseDithered(g, cx, cy, r*0.98, r*0.85, tone);
         g.strokeStyle = PAL[0];
         g.lineWidth = Math.max(1, r*0.04);
         for(let k=-3;k<=3;k++){
           g.beginPath();
-          g.ellipse(cx, cy, Math.abs(k)*r*0.14+r*0.08, r*0.86, 0, 0, Math.PI*2);
+          g.ellipse(cx, cy, Math.abs(k)*r*0.14+r*0.08, r*0.83, 0, 0, Math.PI*2);
           g.stroke();
         }
         g.fillStyle = PAL[0];
@@ -674,6 +718,7 @@
         break;
       }
     }
+    g.restore();
   }
 
   function render(){
@@ -714,7 +759,7 @@
     }
 
     for(const b of bodies){
-      drawProduce(b.x, b.y, TIERS[b.tier].r, b.tier);
+      drawProduce(b.x, b.y, TIERS[b.tier].r, b.tier, undefined, b.angle);
     }
   }
 
