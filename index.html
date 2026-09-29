@@ -45,6 +45,8 @@
   }
   #game{
     max-width:100%;
+    max-height:80vh;
+    width:auto;
     height:auto;
   }
   #hud{
@@ -94,6 +96,26 @@
     margin-top:10px;
     letter-spacing:1px;
   }
+  #tierGuideBox{
+    margin-top:10px;
+    background:var(--c2);
+    border:2px solid var(--c0);
+    padding:5px 6px;
+    text-align:center;
+  }
+  #tierGuideLabel{
+    font-size:8px;
+    color:var(--c0);
+    margin-bottom:3px;
+    letter-spacing:1px;
+  }
+  #tierGuide{
+    display:block;
+    max-width:100%;
+    height:auto;
+    margin:0 auto;
+    image-rendering:pixelated;
+  }
 </style>
 </head>
 <body>
@@ -103,7 +125,7 @@
     <div class="box" id="nextLabel">NEXT<br><canvas id="nextIcon" width="28" height="28" style="vertical-align:middle;image-rendering:pixelated;"></canvas></div>
   </div>
   <div id="screen">
-    <canvas id="game" width="320" height="288"></canvas>
+    <canvas id="game" width="300" height="460"></canvas>
     <div id="overlay">
       <div>GAME OVER</div>
       <div id="finalScore" style="font-size:9px;"></div>
@@ -111,6 +133,10 @@
     </div>
   </div>
   <div id="hint">HOLD TO AIM, RELEASE TO DROP<br>OR ←→ + SPACE</div>
+  <div id="tierGuideBox">
+    <div id="tierGuideLabel">小 → 大 の進化順</div>
+    <canvas id="tierGuide" width="280" height="32"></canvas>
+  </div>
 </div>
 
 <script>
@@ -122,6 +148,8 @@
   const scoreEl = document.getElementById('scoreVal');
   const nextIconCanvas = document.getElementById('nextIcon');
   const nextIconCtx = nextIconCanvas.getContext('2d');
+  const tierGuideCanvas = document.getElementById('tierGuide');
+  const tierGuideCtx = tierGuideCanvas.getContext('2d');
   const overlay = document.getElementById('overlay');
   const finalScoreEl = document.getElementById('finalScore');
   const retryBtn = document.getElementById('retryBtn');
@@ -153,10 +181,12 @@
 
   // ================= TUNABLE PHYSICS CONFIG =================
   const GRAVITY        = 0.42;   // fall acceleration per frame
-  const WALL_L          = 76, WALL_R = W-76, FLOOR = H-10; // narrow, jar-like play field
+  const WALL_L          = 66, WALL_R = W-66, FLOOR = H-14; // narrow, jar-like play field
   const JAR_CORNER      = 22; // rounded bottom-corner radius, for a glass-jar silhouette
-  const DROP_Y          = 30;
-  const GAMEOVER_LINE   = 40;
+  const SHOULDER_W      = 20; // how far the mouth flares outward from the body
+  const SHOULDER_H      = 30; // vertical run of that flare, at the very top
+  const DROP_Y          = 48; // below the shoulder, so drops start in the straight body
+  const GAMEOVER_LINE   = 62;
 
   const AIR_DRAG_Y      = 0.98;  // vertical damping per frame
   const AIR_DRAG_X      = 0.82;  // horizontal damping per frame (friction-like)
@@ -208,6 +238,24 @@
     nextIconCtx.scale(scale,scale);
     drawProduce(0,0,t.r,nextTier,nextIconCtx);
     nextIconCtx.restore();
+  }
+
+  // draws every tier, smallest to largest, so the player can see the
+  // full growth order at a glance (like the reference chart's side strip)
+  function drawTierGuide(){
+    const w = tierGuideCanvas.width, h = tierGuideCanvas.height;
+    tierGuideCtx.clearRect(0,0,w,h);
+    const slot = w / TIERS.length;
+    TIERS.forEach((t,i)=>{
+      const cx = slot*i + slot/2;
+      const cy = h/2;
+      const scale = Math.min(1, (slot*0.42)/t.r);
+      tierGuideCtx.save();
+      tierGuideCtx.translate(cx,cy);
+      tierGuideCtx.scale(scale,scale);
+      drawProduce(0,0,t.r,i,tierGuideCtx);
+      tierGuideCtx.restore();
+    });
   }
 
   function addBody(x,y,tier,vy){
@@ -584,9 +632,9 @@
         const pathFn = ()=>{
           g.beginPath();
           g.moveTo(cx, cy-r*0.95);
-          g.quadraticCurveTo(cx+r*0.6, cy-r*0.45, cx+r*0.4, cy+r*0.55);
-          g.quadraticCurveTo(cx, cy+r*0.95, cx-r*0.4, cy+r*0.55);
-          g.quadraticCurveTo(cx-r*0.6, cy-r*0.45, cx, cy-r*0.95);
+          g.quadraticCurveTo(cx+r*0.9, cy-r*0.5, cx+r*0.72, cy+r*0.5);
+          g.quadraticCurveTo(cx, cy+r*0.98, cx-r*0.72, cy+r*0.5);
+          g.quadraticCurveTo(cx-r*0.9, cy-r*0.5, cx, cy-r*0.95);
           g.closePath();
         };
         fillPathDithered(g, tone, pathFn, cx-r, cy-r, r*2, r*2);
@@ -599,18 +647,18 @@
         break;
       }
       case 'peanut': {
-        fillEllipseDithered(g, cx, cy-r*0.42, r*0.55, r*0.58, tone);
-        fillEllipseDithered(g, cx, cy+r*0.42, r*0.55, r*0.58, tone);
+        fillEllipseDithered(g, cx, cy-r*0.3, r*0.72, r*0.72, tone);
+        fillEllipseDithered(g, cx, cy+r*0.3, r*0.72, r*0.72, tone);
         g.strokeStyle = PAL[0];
         g.lineWidth = Math.max(1, r*0.1);
         g.beginPath();
-        g.moveTo(cx-r*0.32, cy-r*0.06);
-        g.quadraticCurveTo(cx, cy-r*0.18, cx+r*0.32, cy-r*0.06);
-        g.moveTo(cx-r*0.32, cy+r*0.06);
-        g.quadraticCurveTo(cx, cy+r*0.18, cx+r*0.32, cy+r*0.06);
+        g.moveTo(cx-r*0.42, cy-r*0.06);
+        g.quadraticCurveTo(cx, cy-r*0.2, cx+r*0.42, cy-r*0.06);
+        g.moveTo(cx-r*0.42, cy+r*0.06);
+        g.quadraticCurveTo(cx, cy+r*0.2, cx+r*0.42, cy+r*0.06);
         g.stroke();
         g.fillStyle = PAL[0];
-        [[-0.28,-0.55],[0.28,-0.55],[-0.28,0.55],[0.28,0.55]].forEach(([ox,oy])=>{
+        [[-0.32,-0.42],[0.32,-0.42],[-0.32,0.42],[0.32,0.42]].forEach(([ox,oy])=>{
           g.beginPath();
           g.arc(cx+ox*r, cy+oy*r, r*0.07, 0, Math.PI*2);
           g.fill();
@@ -621,18 +669,18 @@
         const ang = 0.35;
         const pathFn = ()=>{
           g.beginPath();
-          g.ellipse(cx, cy, r*0.5, r*1.0, ang, 0, Math.PI*2);
+          g.ellipse(cx, cy, r*0.74, r*0.92, ang, 0, Math.PI*2);
         };
         fillPathDithered(g, tone, pathFn, cx-r, cy-r, r*2, r*2);
         g.fillStyle = PAL[0];
-        [[-0.15,-0.45],[0.22,0.15],[-0.05,0.5]].forEach(([ox,oy])=>{
+        [[-0.15,-0.4],[0.22,0.15],[-0.05,0.45]].forEach(([ox,oy])=>{
           g.beginPath();
           g.ellipse(cx+ox*r, cy+oy*r, r*0.12, r*0.06, ang, 0, Math.PI*2);
           g.fill();
         });
         g.fillStyle = PAL[3];
         g.beginPath();
-        g.ellipse(cx-r*0.18, cy-r*0.35, r*0.1, r*0.28, ang, 0, Math.PI*2);
+        g.ellipse(cx-r*0.2, cy-r*0.3, r*0.12, r*0.3, ang, 0, Math.PI*2);
         g.fill();
         break;
       }
@@ -686,10 +734,10 @@
         break;
       }
       case 'corn': {
-        fillEllipseDithered(g, cx, cy, r*0.5, r*0.96, tone);
+        fillEllipseDithered(g, cx, cy, r*0.74, r*0.92, tone);
         g.fillStyle = PAL[0];
-        for(let ry=-0.85; ry<=0.85; ry+=0.28){
-          for(let rx=-0.35; rx<=0.35; rx+=0.32){
+        for(let ry=-0.8; ry<=0.8; ry+=0.28){
+          for(let rx=-0.5; rx<=0.5; rx+=0.32){
             g.beginPath();
             g.arc(cx+rx*r, cy+ry*r, r*0.065, 0, Math.PI*2);
             g.fill();
@@ -733,16 +781,18 @@
     ctx.fillStyle = PAL[3];
     ctx.fillRect(0,0,W,H);
 
-    // glass jar outline: straight walls, gently rounded bottom corners
+    // glass jar outline: flared mouth/shoulder, straight body, rounded bottom
     ctx.strokeStyle = PAL[0];
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(WALL_L, 0);
+    ctx.moveTo(WALL_L-SHOULDER_W, 0);
+    ctx.lineTo(WALL_L, SHOULDER_H);
     ctx.lineTo(WALL_L, FLOOR-JAR_CORNER);
     ctx.quadraticCurveTo(WALL_L, FLOOR, WALL_L+JAR_CORNER, FLOOR);
     ctx.lineTo(WALL_R-JAR_CORNER, FLOOR);
     ctx.quadraticCurveTo(WALL_R, FLOOR, WALL_R, FLOOR-JAR_CORNER);
-    ctx.lineTo(WALL_R, 0);
+    ctx.lineTo(WALL_R, SHOULDER_H);
+    ctx.lineTo(WALL_R+SHOULDER_W, 0);
     ctx.stroke();
 
     // glass shine: a couple of pale streaks near the left wall
@@ -750,12 +800,12 @@
     ctx.lineWidth = 3;
     ctx.setLineDash([10,14]);
     ctx.beginPath();
-    ctx.moveTo(WALL_L+10, 14);
+    ctx.moveTo(WALL_L+10, SHOULDER_H+8);
     ctx.lineTo(WALL_L+10, FLOOR-30);
     ctx.stroke();
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(WALL_L+20, 14);
+    ctx.moveTo(WALL_L+20, SHOULDER_H+8);
     ctx.lineTo(WALL_L+20, FLOOR-60);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -796,6 +846,7 @@
     requestAnimationFrame(loop);
   }
 
+  drawTierGuide();
   resetGame();
   loop();
 })();
